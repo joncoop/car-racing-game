@@ -35,7 +35,7 @@ YELLOW_CAR = pygame.image.load("images/Cars/car_yellow_2.png").convert_alpha()
 
 enemy_car_images = [RED_CAR, GREEN_CAR, BLUE_CAR, YELLOW_CAR]
 
-GRASS = pygame.image.load("images/Tiles/Grass/land_grass11.png").convert_alpha()
+GRASS = pygame.image.load("images/Tiles/land_grass11.png").convert_alpha()
 
 # Fonts
 FONT_SM = pygame.font.Font(None, 48)
