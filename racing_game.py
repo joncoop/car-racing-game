@@ -20,6 +20,23 @@ GRAY = (175, 175, 175)
 YELLOW = (255, 255, 0)
 BLACK = (0, 0, 0)
 
+# Make the window
+window = pygame.display.set_mode([WIDTH, HEIGHT])
+pygame.display.set_caption(TITLE)
+clock = pygame.time.Clock()
+
+# Images
+BLACK_CAR = pygame.image.load("images/Cars/car_black_2.png").convert_alpha()
+
+RED_CAR = pygame.image.load("images/Cars/car_red_2.png").convert_alpha()
+GREEN_CAR = pygame.image.load("images/Cars/car_green_2.png").convert_alpha()
+BLUE_CAR = pygame.image.load("images/Cars/car_blue_2.png").convert_alpha()
+YELLOW_CAR = pygame.image.load("images/Cars/car_yellow_2.png").convert_alpha()
+
+enemy_car_images = [RED_CAR, GREEN_CAR, BLUE_CAR, YELLOW_CAR]
+
+GRASS = pygame.image.load("images/Tiles/Grass/land_grass11.png").convert_alpha()
+
 # Fonts
 FONT_SM = pygame.font.Font(None, 48)
 FONT_MD = pygame.font.Font(None, 64)
@@ -34,23 +51,19 @@ START = 0
 PLAYING = 1
 END = 2
 
-# Make the window
-window = pygame.display.set_mode([WIDTH, HEIGHT])
-pygame.display.set_caption(TITLE)
-clock = pygame.time.Clock()
-
 # Game settings
-num_enemy_cars = 5
+num_enemy_cars = 7
 
 # Game classes
 class PlayerCar(pygame.sprite.Sprite):
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, image):
         super().__init__()
-        
-        self.rect = pygame.Rect(x, y, 80, 125)
-        self.image = pygame.surface.Surface([80, 125])
-        self.image.fill(BLUE)
+
+        self.image = image;
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
         self.hit = False
 
     def update(self, controls, road, enemies):
@@ -84,13 +97,14 @@ class EnemyCar(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
 
+        self.image = random.choice(enemy_car_images);
+        self.rect = self.image.get_rect()
         x = random.choice([120, 240, 360, 480, 600])
         y = random.randrange(-3000, -100)
-        
-        self.rect = pygame.Rect(x, y, 80, 125)
-        self.image = pygame.surface.Surface([80, 125])
-        self.image.fill(RED)
-        
+        self.rect.x = x
+        self.rect.y = y
+        self.hit = False        
+
         self.speed = random.choice([3, 4, 5, 5, 5, 5, 10])
         self.drift = random.choice([0, 0, 0, 0, 0, 0, -1, 1])
 
@@ -122,7 +136,7 @@ class EnemyCar(pygame.sprite.Sprite):
 
             self.drift, h.drift = h.drift, self.drift
         
-class Road():
+class Road(pygame.sprite.Sprite):
 
     def __init__(self, left, right):
         self.left = left
@@ -139,25 +153,52 @@ class Road():
                 pygame.draw.rect(window, WHITE, [x - 5, y, 10, 30])
 
     def update(self):
-        self.scroll += 7
+        self.scroll += 16
 
         if self.scroll >= 0:
             self.scroll = -100
+
+class Grass(pygame.sprite.Sprite):
+
+    def __init__(self):
+        super().__init__()
+                
+        self.image = pygame.surface.Surface([WIDTH, HEIGHT])
+        self.rect = self.image.get_rect()
+
+        tile_size = GRASS.get_width()
+
+        for x in range(0, WIDTH, tile_size):
+            for y in range(-1 * tile_size, HEIGHT, tile_size):
+                self.image.blit(GRASS, [x, y])
+
+        self.scroll = 0
+
+    def update(self):
+        self.scroll = (self.scroll + 16) % 128
+        self.rect.y = self.scroll
+
       
 # Helper functions
 def setup():
-    global road, car, player, enemies, stage
+    global road, car, player, enemies, scenery, score, stage, ticks
     
     road = Road(100, 700)
-    car = PlayerCar(360, 500)
+    grass = Grass()
+    car = PlayerCar(360, 500, BLACK_CAR)
     player = pygame.sprite.GroupSingle()
     player.add(car)
+    score = 0
 
     enemies = pygame.sprite.Group()
     for i in range(num_enemy_cars):
         e = EnemyCar()
         enemies.add(e)
 
+    scenery = pygame.sprite.Group()
+    scenery.add(grass)
+    
+    ticks = 0
     stage = START
     
 def start():
@@ -200,6 +241,14 @@ def show_end_screen():
     window.blit(title, title_rect)
     window.blit(sub_title, sub_title_rect)
 
+def show_stats():
+    score_txt = FONT_SM.render(str(score), 1, BLACK)
+    score_rect = score_txt.get_rect()
+    score_rect.centerx = WIDTH / 2
+    score_rect.centery = 30
+
+    window.blit(score_txt, score_rect)
+ 
 # Game loop
 setup()
 running = True
@@ -221,6 +270,8 @@ while running:
     # Game logic
     if stage == PLAYING:
         road.update()
+        scenery.update()
+        
         for e in enemies:
             e.update(road, enemies)
 
@@ -232,13 +283,24 @@ while running:
         if len(enemies) < num_enemy_cars:
             e = EnemyCar()
             enemies.add(e)
+
+        ticks = (ticks + 1) % (FPS // 4)
+
+        if ticks == 0:
+            score += 1
+
+            if score % 100 == 0:
+                num_enemy_cars += 1
             
     # Drawing
-    window.fill(GREEN)
+    scenery.draw(window)
     road.draw()
     player.draw(window)
     enemies.draw(window)
 
+    if stage != START:
+        show_stats()
+    
     if stage == START:
         show_title_screen()
     elif stage == END:
