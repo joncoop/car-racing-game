@@ -45,6 +45,7 @@ FONT_LG = pygame.font.Font("fonts/RacingSansOne-Regular.ttf", 96)
 # Sounds
 pygame.mixer.music.load("sounds/engine.ogg")
 CRASH = pygame.mixer.Sound("sounds/crash.ogg")
+HONK = pygame.mixer.Sound("sounds/honk.ogg")
 
 # Stages
 START = 0
@@ -66,16 +67,21 @@ class PlayerCar(pygame.sprite.Sprite):
         self.rect.y = y
         self.hit = False
 
-    def update(self, controls, road, enemies):
-        if controls[pygame.K_LEFT]:
+    def update(self, events, pressed, road, enemies):
+        for e in events:
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_SPACE:
+                    HONK.play()
+        
+        if pressed[pygame.K_LEFT]:
             self.rect.x -= 4
-        elif controls[pygame.K_RIGHT]:
+        elif pressed[pygame.K_RIGHT]:
             self.rect.x += 4
 
-        if controls[pygame.K_UP]:
+        if pressed[pygame.K_UP]:
             self.rect.y -= 4
             pygame.mixer.music.set_volume(0.8)
-        elif controls[pygame.K_DOWN]:
+        elif pressed[pygame.K_DOWN]:
             self.rect.y += 4
             pygame.mixer.music.set_volume(0.4)
         else:
@@ -255,6 +261,8 @@ running = True
 
 while running:
     # Input handling
+    key_events = []
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -264,8 +272,10 @@ while running:
                     start()
                 elif stage == END:
                     setup()
+                else:
+                    key_events.append(event)
 
-    controls = pygame.key.get_pressed()
+    keys_pressed = pygame.key.get_pressed()
     
     # Game logic
     if stage == PLAYING:
@@ -275,7 +285,7 @@ while running:
         for e in enemies:
             e.update(road, enemies)
 
-        player.update(controls, road, enemies)
+        player.update(key_events, keys_pressed, road, enemies)
 
         if car.hit == True:
             end()
