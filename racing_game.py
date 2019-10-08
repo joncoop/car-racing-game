@@ -6,8 +6,8 @@ import random
 pygame.init()
 
 # Window settings
-WIDTH = 800
-HEIGHT = 700
+WIDTH = 960
+HEIGHT = 660
 TITLE = "Racing Game!"
 FPS = 60
 
@@ -26,16 +26,19 @@ pygame.display.set_caption(TITLE)
 clock = pygame.time.Clock()
 
 # Images
+''' Cars '''
 BLACK_CAR = pygame.image.load("images/Cars/car_black_2.png").convert_alpha()
-
 RED_CAR = pygame.image.load("images/Cars/car_red_2.png").convert_alpha()
 GREEN_CAR = pygame.image.load("images/Cars/car_green_2.png").convert_alpha()
 BLUE_CAR = pygame.image.load("images/Cars/car_blue_2.png").convert_alpha()
 YELLOW_CAR = pygame.image.load("images/Cars/car_yellow_2.png").convert_alpha()
-
 enemy_car_images = [RED_CAR, GREEN_CAR, BLUE_CAR, YELLOW_CAR]
 
+''' Scenery '''
 GRASS = pygame.image.load("images/Tiles/land_grass11.png").convert_alpha()
+
+''' Items '''
+OIL = pygame.image.load("images/Items/oil.png").convert_alpha()
 
 # Fonts
 FONT_SM = pygame.font.Font(None, 48)
@@ -46,6 +49,7 @@ FONT_LG = pygame.font.Font("fonts/RacingSansOne-Regular.ttf", 96)
 pygame.mixer.music.load("sounds/engine.ogg")
 CRASH = pygame.mixer.Sound("sounds/crash.ogg")
 HONK = pygame.mixer.Sound("sounds/honk.ogg")
+SQUEAL = pygame.mixer.Sound("sounds/tire_squeal.ogg")
 
 # Stages
 START = 0
@@ -61,42 +65,63 @@ class PlayerCar(pygame.sprite.Sprite):
     def __init__(self, x, y, image):
         super().__init__()
 
-        self.image = image;
+        self.image = image
+        self.image_original = image
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
         self.hit = False
+        self.spinning = False
+        self.angle = 0
 
+    def rotate(self):
+        self.angle += 15
+        center = self.rect.center
+        self.image = pygame.transform.rotate(self.image_original, self.angle)
+        self.rect.center = center
+        
     def update(self, events, pressed, road, enemies):
+        if self.spinning and self.angle < 360:
+            self.rotate()
+        else:
+            self.spinning = False
+            self.angle = 0
+        
         for e in events:
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_SPACE:
                     HONK.play()
-        
-        if pressed[pygame.K_LEFT]:
-            self.rect.x -= 4
-        elif pressed[pygame.K_RIGHT]:
-            self.rect.x += 4
 
-        if pressed[pygame.K_UP]:
-            self.rect.y -= 4
-            pygame.mixer.music.set_volume(0.8)
-        elif pressed[pygame.K_DOWN]:
-            self.rect.y += 4
-            pygame.mixer.music.set_volume(0.4)
-        else:
-            pygame.mixer.music.set_volume(0.5)
+        if not self.spinning:
+            if pressed[pygame.K_LEFT]:
+                self.rect.x -= 4
+            elif pressed[pygame.K_RIGHT]:
+                self.rect.x += 4
+
+            if pressed[pygame.K_UP]:
+                self.rect.y -= 4
+                pygame.mixer.music.set_volume(0.8)
+            elif pressed[pygame.K_DOWN]:
+                self.rect.y += 4
+                pygame.mixer.music.set_volume(0.4)
+            else:
+                pygame.mixer.music.set_volume(0.5)
 
         self.rect.left = max(self.rect.left, road.left)
         self.rect.right = min(self.rect.right, road.right)
         self.rect.top = max(self.rect.top, 0)
         self.rect.bottom = min(self.rect.bottom, HEIGHT)
 
-        hit_list = pygame.sprite.spritecollide(self, enemies, False)
+        hit_list = pygame.sprite.spritecollide(self, enemies, False, pygame.sprite.collide_mask)
         
         if len(hit_list) > 0 and self.hit == False:
             CRASH.play()
             self.hit = True
+            
+        hit_list = pygame.sprite.spritecollide(self, items, False, pygame.sprite.collide_mask)
+        
+        for hit in hit_list:
+            hit.apply(self)
                 
 class EnemyCar(pygame.sprite.Sprite):
 
@@ -104,8 +129,9 @@ class EnemyCar(pygame.sprite.Sprite):
         super().__init__()
 
         self.image = random.choice(enemy_car_images);
+        self.mask = pygame.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
-        x = random.choice([120, 240, 360, 480, 600])
+        x = random.choice([203, 323, 443, 563, 683])
         y = random.randrange(-3000, -100)
         self.rect.x = x
         self.rect.y = y
@@ -128,7 +154,7 @@ class EnemyCar(pygame.sprite.Sprite):
         if self.rect.top > HEIGHT:
             self.kill()
 
-        hit_list = pygame.sprite.spritecollide(self, enemies, False)
+        hit_list = pygame.sprite.spritecollide(self, enemies, False, pygame.sprite.collide_mask)
         
         for h in hit_list:
             if self is not h and self.speed > h.speed and self.rect.centery < h.rect.centery:
@@ -159,7 +185,7 @@ class Road(pygame.sprite.Sprite):
                 pygame.draw.rect(window, WHITE, [x - 5, y, 10, 30])
 
     def update(self):
-        self.scroll += 16
+        self.scroll += speed
 
         if self.scroll >= 0:
             self.scroll = -100
@@ -181,17 +207,43 @@ class Grass(pygame.sprite.Sprite):
         self.scroll = 0
 
     def update(self):
-        self.scroll = (self.scroll + 16) % 128
+        self.scroll = (self.scroll + speed) % 128
         self.rect.y = self.scroll
 
+class OilSlick(pygame.sprite.Sprite):
+
+    def __init__(self, img, x, y):
+        super().__init__()
+        
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.set_random_loc()
+
+        self.used = False
+
+    def set_random_loc(self):
+        self.rect.x = random.randrange(185, 665)
+        self.rect.y = random.randrange(-2000, -100)
+        self.used = False
+
+    def apply(self, other):
+        if not self.used:
+            other.spinning = True
+            SQUEAL.play()
+    
+    def update(self):
+        self.rect.y += speed
+
+        if self.rect.top > HEIGHT:
+            self.set_random_loc() 
       
 # Helper functions
 def setup():
-    global road, car, player, enemies, scenery, score, stage, ticks
+    global road, car, player, enemies, scenery, items, score, stage, speed, ticks
     
-    road = Road(100, 700)
+    road = Road(180, 780)
     grass = Grass()
-    car = PlayerCar(360, 500, BLACK_CAR)
+    car = PlayerCar(445, 500, BLACK_CAR)
     player = pygame.sprite.GroupSingle()
     player.add(car)
     score = 0
@@ -201,9 +253,14 @@ def setup():
         e = EnemyCar()
         enemies.add(e)
 
+    items = pygame.sprite.Group()
+    oil = OilSlick(OIL, 500, 400)
+    items.add(oil)
+    
     scenery = pygame.sprite.Group()
     scenery.add(grass)
-    
+
+    speed = 16
     ticks = 0
     stage = START
     
@@ -285,6 +342,8 @@ while running:
         for e in enemies:
             e.update(road, enemies)
 
+        items.update()
+
         player.update(key_events, keys_pressed, road, enemies)
 
         if car.hit == True:
@@ -305,6 +364,7 @@ while running:
     # Drawing
     scenery.draw(window)
     road.draw()
+    items.draw(window)
     player.draw(window)
     enemies.draw(window)
 
