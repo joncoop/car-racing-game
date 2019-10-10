@@ -114,14 +114,15 @@ class PlayerCar(pygame.sprite.Sprite):
 
         hit_list = pygame.sprite.spritecollide(self, enemies, False, pygame.sprite.collide_mask)
         
-        if len(hit_list) > 0 and self.hit == False:
+        for car in hit_list:
             CRASH.play()
             self.hit = True
+            car.hit = True
             
         hit_list = pygame.sprite.spritecollide(self, items, False, pygame.sprite.collide_mask)
         
-        for hit in hit_list:
-            hit.apply(self)
+        for item in hit_list:
+            item.apply(self)
                 
 class EnemyCar(pygame.sprite.Sprite):
 
@@ -141,18 +142,19 @@ class EnemyCar(pygame.sprite.Sprite):
         self.drift = random.choice([0, 0, 0, 0, 0, 0, -1, 1])
 
     def update(self, road, enemies):
-        self.rect.x += self.drift
-        self.rect.y += self.speed
+        if not self.hit:
+            self.rect.x += self.drift
+            self.rect.y += self.speed
 
-        if self.rect.left < road.left:
-            self.rect.left = road.left
-            self.drift *= -1 
-        elif self.rect.right > road.right:
-            self.rect.right = road.right
-            self.drift *= -1
-            
-        if self.rect.top > HEIGHT:
-            self.kill()
+            if self.rect.left < road.left:
+                self.rect.left = road.left
+                self.drift *= -1 
+            elif self.rect.right > road.right:
+                self.rect.right = road.right
+                self.drift *= -1
+                
+            if self.rect.top > HEIGHT:
+                self.kill()
 
         hit_list = pygame.sprite.spritecollide(self, enemies, False, pygame.sprite.collide_mask)
         
@@ -272,7 +274,10 @@ def start():
 
 def end():
     global stage
-    
+
+    for e in enemies:
+        e.speed *= -1
+        
     stage = END
     pygame.mixer.music.stop()
 
@@ -338,9 +343,6 @@ while running:
     if stage == PLAYING:
         road.update()
         scenery.update()
-        
-        for e in enemies:
-            e.update(road, enemies)
 
         items.update()
 
@@ -360,6 +362,10 @@ while running:
 
             if score % 100 == 0:
                 num_enemy_cars += 1
+                
+    if stage != START:            
+        for e in enemies:
+            e.update(road, enemies)
             
     # Drawing
     scenery.draw(window)
