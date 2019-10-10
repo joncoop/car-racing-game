@@ -153,8 +153,9 @@ class EnemyCar(pygame.sprite.Sprite):
                 self.rect.right = road.right
                 self.drift *= -1
                 
-            if self.rect.top > HEIGHT:
+            if self.rect.top > HEIGHT or (stage == END and self.rect.bottom < 0):
                 self.kill()
+                
 
         hit_list = pygame.sprite.spritecollide(self, enemies, False, pygame.sprite.collide_mask)
         
